@@ -1,12 +1,13 @@
 import numpy as np
 
 class SimulatedAnnealing:
-    def __init__(self, objective, perturbation, cooling):
+    def __init__(self, objective, perturbation, cooling, stopping_criterion):
         self.status = []
         self.controller = {}
         self.__function_aquisition(objective, 'objective')
         self.__function_aquisition(perturbation, 'perturbation')
         self.__function_aquisition(cooling, 'cooling')
+        self.__function_aquisition(stopping_criterion, 'stopping_criterion')
         self.__final_validation()
 
     def __function_aquisition(self, function, function_name):
