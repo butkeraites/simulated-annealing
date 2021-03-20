@@ -2,10 +2,11 @@ import numpy as np
 import pandas as pd
 
 class SimulatedAnnealing:
-    def __init__(self, objective, perturbation, cooling, stopping_criteria, initial_solution, cooling_factor):
-        self.__initialize_parameters()
+    def __init__(self, objective, perturbation, cooling, stopping_criteria, initial_solution, cooling_factor, initial_temperature, heat_again = True):
+        self.__initialize_parameters(heat_again)
         self.__initial_solution_aquisition(initial_solution)
         self.__cooling_factor_aquisition(cooling_factor)
+        self.__initial_temperature_aquisition(initial_temperature)
         self.__function_aquisition(objective, 'objective')
         self.__function_aquisition(perturbation, 'perturbation')
         self.__function_aquisition(cooling, 'cooling')
@@ -13,14 +14,14 @@ class SimulatedAnnealing:
         self.__final_validation()
         self.__run_optimization()
 
-    def __initialize_parameters(self):
+    def __initialize_parameters(self, heat_again):
         self.status = []
         self.__controller = {
             'stopping_criteria' : []
         }
         self.__parameters = {
             'iteration' : 0,
-            'temperature' : 1e3
+            'reheat' : heat_again
         }
         self.__command = "GO"
 
@@ -45,6 +46,21 @@ class SimulatedAnnealing:
             else:
                 self.status.append("[ERROR] The cooling factor must be a float or int")
                 self.__command = "NO GO"
+
+    def __initial_temperature_aquisition(self, initial_temperature):
+        if self.__command == "GO":
+            if isinstance(initial_temperature, (float, int)):
+                if initial_temperature > 0.0:
+                    self.status.append("[OK] Aquisition of initial temperature done successfully")
+                    self.__parameters['temperature'] = np.float(initial_temperature)
+                    self.__parameters['initial_temperature'] = np.float(initial_temperature)
+                else:
+                    self.status.append("[ERROR] The initial temperature must be positive")
+                    self.__command = "NO GO"
+            else:
+                self.status.append("[ERROR] The initial temperature must be a float or int")
+                self.__command = "NO GO"
+
 
     def __function_aquisition(self, function, function_name):
         if self.__command == "GO":
@@ -82,14 +98,24 @@ class SimulatedAnnealing:
         if any("[ERROR]" in status for status in self.status):
             self.status.append("[ERROR] Simulated annealing creation failed")
             self.__command = "NO GO"
-            print("[ERROR] Simulated annealing creation failed. Check status for more details.")
+            self.__stop_motive = "Input data inconsistency"
         else:
             self.status.append("[OK] Simulated annealing created successfully")
 
     def __halt_by_n_max(self):
+        if self.__parameters['n_max'] < self.__parameters['iteration']:
+            self.__stop_motive = 'n_max'
         return self.__parameters['n_max'] < self.__parameters['iteration']
 
+    def __reheat(self):
+        self.__parameters['temperature'] = np.copy(self.__parameters['initial_temperature'])
+
     def __halt_by_min_temperature(self):
+        if self.__parameters['temperature'] < self.__parameters['min_temperature']:
+            if self.__parameters['reheat']:
+                self.__reheat()
+            else:
+                self.__stop_motive = 'min_temperature'
         return self.__parameters['temperature'] < self.__parameters['min_temperature']
 
     def __new_solution_is_better(self, new_solution):
@@ -103,8 +129,7 @@ class SimulatedAnnealing:
     
     def __change_solution_even_it_is_bad(self, new_solution):
         alpha = np.random.random_sample()
-        boltzman_element = np.exp(self.__division_of_difference_by_temperature(new_solution))
-        #print("alpha: {} --- boltzman_element: {}".format(alpha, boltzman_element))
+        boltzman_element = np.exp(self.__division_of_difference_by_temperature(new_solution), dtype = np.float128)
         return np.less_equal(alpha, boltzman_element)
 
     def __cooling_temperature(self):
@@ -121,3 +146,6 @@ class SimulatedAnnealing:
 
     def get_solution(self):
         return self.__solution
+    
+    def get_stopping_motive(self):
+        return self.__stop_motive
